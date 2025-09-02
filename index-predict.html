@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Stream com Predição</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #0f1115; color: #e5e7eb; font-family: system-ui, Arial; margin: 0; padding: 24px; display: grid; place-content: center; gap: 12px; }
+  #wrap { display: grid; gap: 12px; max-width: 960px; }
+  canvas { width: 100%; height: auto; border-radius: 12px; outline: 1px solid #23262d; }
+  #hud { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  #predicao { font-size: 1.2rem; font-weight: 600; }
+  #status { font-size: .9rem; opacity: .8; }
+  #sensores { font-size: 1rem; display: grid; gap: 4px; }
+  #sensores span { display: block; }
+  code { background: #11151c; padding: 2px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>📹 Stream da ESP32-CAM</h1>
+  <canvas id="canvas"></canvas>
+  <div id="hud">
+    <div id="predicao">Aguardando predição…</div>
+    <div id="status">Conectando…</div>
+  </div>
+  <div id="sensores">
+    <span>🌡️ Temp: ${msg.data.temperature ?? '--'} °C</span>
+    <span>💧 Umidade: ${msg.data.humidity ?? '--'} %</span>
+    <span>🧪 Amônia: ${msg.data.mq137 ?? '--'} ppm</span>
+    
+  </div>
+</div>
+
+<script>
+  // 👉 Ajuste se servidor estiver remoto
+  const WS_URL = 'ws://localhost:8080';
+  const ws = new WebSocket(WS_URL);
+  ws.binaryType = 'arraybuffer';
+
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const predEl = document.getElementById('predicao');
+  const statusEl = document.getElementById('status');
+  const sensoresEl = document.getElementById('sensores');
+
+  let drawing = false;
+  let pendingBlob = null;
+  const img = new Image();
+
+  ws.onopen = () => {
+    statusEl.textContent = 'Conectado';
+    console.log('[WS] conectado:', WS_URL);
+  };
+
+  ws.onerror = (e) => {
+    statusEl.textContent = 'Erro de conexão (console)';
+    console.error('[WS] erro:', e);
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = 'Desconectado';
+    console.warn('[WS] desconectado');
+  };
+
+  ws.onmessage = (event) => {
+    // JSON (sensores, info, predição)
+    
+    if (typeof event.data === 'string') {
+      try {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'sensor' && msg.data) {
+          console.log("🌡️ Dados sensores:", msg.data);
+
+          // Atualiza HUD de sensores
+          sensoresEl.innerHTML = `
+          <span>🌡️ Temp: ${msg.data.temperature ?? '--'} °C</span>
+          <span>💧 Umidade: ${msg.data.humidity ?? '--'} %</span>
+          <span>🧪 Amônia: ${msg.data.mq137 ?? '--'} ppm</span>
+        `;
+
+        }
+        if (msg.type === 'predicao' && msg.dados) {
+          predEl.textContent = `${msg.dados.classe} (${msg.dados.confianca})`;
+        }
+
+        if (msg.type === 'info') {
+          console.log("ℹ️ Info:", msg.data);
+        }
+
+      } catch (err) {
+        console.warn("Falha ao parsear JSON:", event.data);
+      }
+      return;
+    }
+
+    // Binário (frame JPEG)
+    let blob;
+    if (event.data instanceof Blob) {
+      blob = event.data;
+    } else {
+      blob = new Blob([event.data], { type: 'image/jpeg' });
+    }
+
+    pendingBlob = blob;
+    if (!drawing) {
+      drawNext();
+    }
+  };
+
+  function drawNext() {
+    if (!pendingBlob) return;
+    drawing = true;
+
+    const url = URL.createObjectURL(pendingBlob);
+    pendingBlob = null;
+
+    img.onload = () => {
+      if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      drawing = false;
+
+      if (pendingBlob) {
+        requestAnimationFrame(drawNext);
+      }
+    };
+
+    img.onerror = (e) => {
+      console.error('Falha ao decodificar imagem', e);
+      URL.revokeObjectURL(url);
+      drawing = false;
+      if (pendingBlob) requestAnimationFrame(drawNext);
+    };
+
+    img.src = url;
+  }
+</script>
+</body>
+</html>

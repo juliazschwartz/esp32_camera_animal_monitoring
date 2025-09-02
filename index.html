@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stream ESP32-CAM</title>
+</head>
+<body>
+  <h1>Stream ao vivo da ESP32-CAM</h1>
+  <img id="stream" width="640" />
+
+  <script>
+    const ws = new WebSocket('ws://192.168.0.104:8080'); // IP do servidor Node.js
+
+    ws.binaryType = 'blob';
+
+    ws.onopen = () => {
+      console.log('Conectado ao servidor WebSocket');
+    };
+
+    ws.onmessage = (event) => {
+      const url = URL.createObjectURL(event.data);
+      const img = document.getElementById('stream');
+      img.src = url;
+
+      // Libera memória do URL antigo para não vazar memória
+      if (img._prevUrl) {
+        URL.revokeObjectURL(img._prevUrl);
+      }
+      img._prevUrl = url;
+    };
+
+    ws.onclose = () => {
+      console.log('Conexão encerrada');
+    };
+
+    ws.onerror = (err) => {
+      console.error('Erro no WebSocket', err);
+    };
+  </script>
+</body>
+</html>
