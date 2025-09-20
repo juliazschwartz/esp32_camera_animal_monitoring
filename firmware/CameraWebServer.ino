@@ -194,8 +194,6 @@
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
 
-const char* WIFI_SSID = "Zamitello_2G";
-const char* WIFI_PASS = "coruja2024";
 const char* WS_URL = "ws://164.92.239.48:8080";
 
 using namespace websockets;
