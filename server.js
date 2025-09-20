@@ -39,14 +39,7 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (message, isBinary) => {
     if (isBinary) {
-   
   
-      // 📸 Frame da câmera
-      const payload = JSON.stringify({
-        type: 'image',
-        data: message.toString('base64') // necessário se cliente for navegador
-      });
-
       // reenvia para todos os outros clientes
       for (let client of clients) {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
