@@ -18,23 +18,22 @@
 </head>
 <body>
 <div id="wrap">
-  <h1>📹 Stream da ESP32-CAM</h1>
+  <h1>Stream da ESP32-CAM</h1>
   <canvas id="canvas"></canvas>
-  <div id="hud">
-    <div id="predicao">Aguardando predição…</div>
-    <div id="status">Conectando…</div>
-  </div>
+<div id="hud">
+  <div id="status">Conectando…</div>
+  <button id="btn-save">Salvar Frames</button>
+</div>
   <div id="sensores">
-    <span>🌡️ Temp: ${msg.data.temperature ?? '--'} °C</span>
-    <span>💧 Umidade: ${msg.data.humidity ?? '--'} %</span>
-    <span>🧪 Amônia: ${msg.data.mq137 ?? '--'} ppm</span>
+    <span> Temp: ${msg.data.temperature ?? '--'} °C</span>
+    <span> Umidade: ${msg.data.humidity ?? '--'} %</span>
+    <span> Amônia: ${msg.data.mq137 ?? '--'} ppm</span>
     
   </div>
 </div>
 
 <script>
-  // 👉 Ajuste se servidor estiver remoto
-  const WS_URL = 'ws://localhost:8080';
+  const WS_URL = 'ws://164.92.239.48:8081';
   const ws = new WebSocket(WS_URL);
   ws.binaryType = 'arraybuffer';
 
@@ -63,21 +62,18 @@
     console.warn('[WS] desconectado');
   };
 
-  ws.onmessage = (event) => {
-    // JSON (sensores, info, predição)
-    
+  ws.onmessage = (event) => {    
     if (typeof event.data === 'string') {
       try {
         const msg = JSON.parse(event.data);
 
         if (msg.type === 'sensor' && msg.data) {
-          console.log("🌡️ Dados sensores:", msg.data);
+          console.log(" Dados sensores:", msg.data);
 
-          // Atualiza HUD de sensores
           sensoresEl.innerHTML = `
-          <span>🌡️ Temp: ${msg.data.temperature ?? '--'} °C</span>
-          <span>💧 Umidade: ${msg.data.humidity ?? '--'} %</span>
-          <span>🧪 Amônia: ${msg.data.mq137 ?? '--'} ppm</span>
+          <span> Temp: ${msg.data.temperature ?? '--'} °C</span>
+          <span> Umidade: ${msg.data.humidity ?? '--'} %</span>
+          <span> Amônia: ${msg.data.mq137 ?? '--'} ppm</span>
         `;
 
         }
@@ -86,7 +82,7 @@
         }
 
         if (msg.type === 'info') {
-          console.log("ℹ️ Info:", msg.data);
+          console.log(" Info:", msg.data);
         }
 
       } catch (err) {
