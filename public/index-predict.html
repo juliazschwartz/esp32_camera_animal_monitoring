@@ -135,6 +135,30 @@
 
     img.src = url;
   }
+
+btnSave.addEventListener('click', () => {
+  savingFrames = !savingFrames;
+
+  if (savingFrames) {
+    btnSave.textContent = "Parar de Salvar";
+    console.log("Salvamento de frames ATIVADO");
+
+    ws.send(JSON.stringify({
+      type: "save",
+      value: true
+    }));
+
+  } else {
+    btnSave.textContent = "Salvar Frames";
+    console.log("Salvamento DESATIVADO");
+
+    ws.send(JSON.stringify({
+      type: "save",
+      value: false
+    }));
+  }
+});
+
 </script>
 </body>
 </html>
