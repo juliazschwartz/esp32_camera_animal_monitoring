@@ -1,10 +1,11 @@
-// server.js
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
 
 const WebSocket = require('ws');
-// === Servidor HTTP que entrega o HTML ===
+
+let savingFrames = false;
+
 const server = http.createServer((req, res) => {
   if (req.url === "/") {
     const filePath = path.join(__dirname, "public/index-predict.html");
@@ -23,8 +24,8 @@ const server = http.createServer((req, res) => {
   }
 });
 const wss = new WebSocket.Server({
-  port: 8080,
-  perMessageDeflate: false  // 🚫 desliga a compressão
+  port: 8081,
+  perMessageDeflate: false  // desliga a compressão
 });
 let clients = new Set();
 wss.on('error', (err) => {
@@ -34,13 +35,27 @@ wss.on('connection', (ws) => {
     ws.on('error', (err) => {
     console.warn('WS client error (ignored):', err.message);
   });
-  console.log('📡 Cliente conectado');
+  console.log('Cliente conectado');
   clients.add(ws);
 
   ws.on('message', (message, isBinary) => {
     if (isBinary) {
-  
-      // reenvia para todos os outros clientes
+      if (savingFrames) {
+        try {
+          const framesDir = path.join(__dirname, "frames");
+          fs.mkdirSync(framesDir, { recursive: true });
+
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+          const filename = `frame_${timestamp}.jpg`;
+          const fullPath = path.join(framesDir, filename);
+
+          fs.writeFileSync(fullPath, message);
+
+        } catch (err) {
+          console.error("Erro ao salvar frame:", err);
+        }
+      }
       for (let client of clients) {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
           client.send(message, { binary: true });
@@ -48,14 +63,17 @@ wss.on('connection', (ws) => {
       }
 
     } else {
-      // 📝 Texto (JSON ou string simples)
       const msgText = message.toString();
 
       try {
         const parsed = JSON.parse(msgText);
-
-        // já vem no formato { type, data }, só repassar
         const payload = JSON.stringify(parsed);
+        if (parsed && typeof parsed === "object" && "type" in parsed) {
+          if (parsed.type === "save") {
+            savingFrames = parsed.value;
+            return; 
+          }
+        }
 
         for (let client of clients) {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
@@ -64,31 +82,30 @@ wss.on('connection', (ws) => {
         }
 
       } catch (err) {
-        console.log('📩 Mensagem recebida (texto simples):', msgText);
+        console.log('Mensagem recebida (texto simples):', msgText);
 
         const payload = JSON.stringify({
           type: 'info',
           data: msgText
         });
 
-        for (let client of clients) {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(payload);
-          }
-        }
+        //for (let client of clients) {
+         // if (client !== ws && client.readyState === WebSocket.OPEN) {
+          //  client.send(payload);
+         // }
+       // }
       }
     }
   });
 
   ws.on('close', () => {
-    console.log('❌ Cliente desconectado');
+    console.log('Cliente desconectado');
     clients.delete(ws);
   });
 });
-// Sobe tudo na mesma porta
-const PORT = 8000;
+const PORT = 8001;
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando em http://164.92.239.48:${PORT}`);
 });
 
-console.log('🚀 Servidor WebSocket rodando na porta 8080');
+console.log('Servidor WebSocket rodando na porta 8084');
