@@ -24,8 +24,8 @@ const server = http.createServer((req, res) => {
   }
 });
 const wss = new WebSocket.Server({
-  port: 8081,
-  perMessageDeflate: false  // desliga a compressão
+  server: server,
+  perMessageDeflate: false
 });
 let clients = new Set();
 wss.on('error', (err) => {
@@ -51,6 +51,8 @@ wss.on('connection', (ws) => {
           const fullPath = path.join(framesDir, filename);
 
           fs.writeFileSync(fullPath, message);
+          console.log(framesDir)
+
 
         } catch (err) {
           console.error("Erro ao salvar frame:", err);
@@ -71,6 +73,7 @@ wss.on('connection', (ws) => {
         if (parsed && typeof parsed === "object" && "type" in parsed) {
           if (parsed.type === "save") {
             savingFrames = parsed.value;
+            console.log(`salvar frames ${parsed.value}`)
             return; 
           }
         }
@@ -103,9 +106,9 @@ wss.on('connection', (ws) => {
     clients.delete(ws);
   });
 });
-const PORT = 8001;
+const PORT = 8000;
 server.listen(PORT, () => {
-  console.log(`Servidor rodando em http://164.92.239.48:${PORT}`);
+  console.log(`Servidor rodando em http://127.0.0.1:${PORT}`);
 });
 
-console.log('Servidor WebSocket rodando na porta 8084');
+console.log(`Servidor WebSocket rodando na porta ${PORT}`);
