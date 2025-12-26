@@ -33,8 +33,12 @@
 </div>
 
 <script>
-  const WS_URL = 'ws://164.92.239.48:8081';
-  const ws = new WebSocket(WS_URL);
+  const ws = new WebSocket(
+   (location.protocol === "https:" ? "wss://" : "ws://") +
+   location.host
+  );
+  let savingFrames = false;
+
   ws.binaryType = 'arraybuffer';
 
   const canvas = document.getElementById('canvas');
@@ -136,7 +140,9 @@
     img.src = url;
   }
 
+const btnSave = document.getElementById("btn-save")
 btnSave.addEventListener('click', () => {
+  console.log('oi')
   savingFrames = !savingFrames;
 
   if (savingFrames) {
