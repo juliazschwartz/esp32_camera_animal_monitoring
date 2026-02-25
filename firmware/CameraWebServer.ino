@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <WebSocketsClient.h>
+#include <WiFiManager.h> 
 #include "esp_camera.h"
 #include "esp_bt.h" // Vamos desligar o BT para garantir estabilidade
 
@@ -60,7 +61,7 @@ bool initCamera() {
   config.pixel_format = PIXFORMAT_JPEG;
 
   config.frame_size   = FRAMESIZE_QQVGA; 
-  config.jpeg_quality = 20; // Qualidade 20 é mais leve para o buffer que 60
+  config.jpeg_quality = 30; // Qualidade 20 é mais leve para o buffer que 60
   config.fb_count     = 1; 
 
   if (esp_camera_init(&config) != ESP_OK) return false;
@@ -70,23 +71,38 @@ bool initCamera() {
 void setup() {
   Serial.begin(115200);
   btStop(); // Desliga Bluetooth para liberar RAM para o SSL
+  // 2. Configuração do WiFiManager
+  WiFiManager wm;
+
+  wm.setConfigPortalTimeout(180);
+  Serial.println("Iniciando WiFiManager...");
+  // wm.resetSettings();
+      if (!wm.autoConnect("ESP32")) {
+        Serial.println("Falha na conexao e timeout atingido. Reiniciando...");
+        delay(3000);
+        ESP.restart();
+    }
+
+
+  Serial.println("WiFi Conectado via WiFiManager!");
 
   if (!initCamera()) {
     Serial.println("Erro Camera!");
     return;
   }
 
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500); Serial.print(".");
-  }
-  Serial.println("\nWiFi OK!");
+  // WiFi.begin(ssid, password);
+  // while (WiFi.status() != WL_CONNECTED) {
+  //   delay(500); Serial.print(".");
+  // }
+  // Serial.println("\nWiFi OK!");
 
   // Configurações de estabilidade antes de iniciar a Task
   webSocket.setReconnectInterval(5000);
   webSocket.enableHeartbeat(10000, 3000, 2); 
 
   webSocket.beginSSL("mouse-monitoring.rennanfelipe.net", 9443, "/ws/");
+  // webSocket.begin("164.92.239.48", 8083, "/ws/");
   
   webSocket.onEvent([](WStype_t type, uint8_t * payload, size_t length) {
     if (type == WStype_CONNECTED) {
