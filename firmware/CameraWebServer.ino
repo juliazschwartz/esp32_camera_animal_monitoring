@@ -47,9 +47,10 @@ void init_camera() {
   config.pixel_format = PIXFORMAT_JPEG;
 
   // Ajuste equilibrado: QVGA com qualidade moderada
-  config.frame_size = FRAMESIZE_QVGA; 
-  config.jpeg_quality = 15; // 10 a 20 é o ideal para WSS
+  config.frame_size = FRAMESIZE_QQVGA; 
+  config.jpeg_quality = 40; // 10 a 20 é o ideal para WSS
   config.fb_count = 1;      // Reduzir para 1 economiza MUITA RAM para o SSL
+  config.xclk_freq_hz = 10000000; // Reduza para 10MHz ou até 8MHz
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -69,17 +70,21 @@ void init_websocket() {
     if(type == WStype_DISCONNECTED) Serial.println("Desconectado!");
   });
 }
-
 void cameraTask(void* pvParameters) {
   for (;;) {
-    camera_fb_t* fb = esp_camera_fb_get();
-    if (fb) {
-      if (xQueueSend(frameQueue, &fb, 0) != pdTRUE) {
-        esp_camera_fb_return(fb);
+    if (webSocket.isConnected()) {
+      camera_fb_t* fb = esp_camera_fb_get();
+      if (fb) {
+        if (xQueueSend(frameQueue, &fb, 0) != pdTRUE) {
+          esp_camera_fb_return(fb);
+        }
       }
+      // Dê um descanso longo entre frames inicialmente
+      vTaskDelay(2000 / portTICK_PERIOD_MS); 
+    } else {
+      // Se não estiver conectado, não faz nada e espera
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    // Aumente para 500ms (2 frames por segundo) para testar a estabilidade total
-    vTaskDelay(500 / portTICK_PERIOD_MS); 
   }
 }
 
@@ -89,6 +94,7 @@ void setup() {
 
   frameQueue = xQueueCreate(2, sizeof(camera_fb_t*));
   
+  WiFi.setSleep(false);
   WiFi.begin("los_pollos", "BlueMagic99%");
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
   
@@ -99,21 +105,28 @@ void setup() {
 void loop() {
   webSocket.loop();
 
-  camera_fb_t* fb = NULL;
-  if (webSocket.isConnected() && xQueueReceive(frameQueue, &fb, 0)) {
-    if (fb) {
-      // Monitor de RAM para debug
-      size_t freeHeap = ESP.getFreeHeap();
-      
-      if(freeHeap > 10000) { // Só tenta enviar se tiver mais de 10KB de RAM
-        bool ok = webSocket.sendBIN(fb->buf, fb->len);
-        if(!ok) Serial.println("Erro no envio SSL");
-      } else {
-        Serial.println("RAM baixa! Pulando frame...");
+  static unsigned long lastFrameTime = 0;
+  
+  if (webSocket.isConnected()) {
+    // Dá um intervalo de 3 segundos entre frames. 
+    // É lento, mas garante que o SSL termine de enviar o anterior.
+    if (millis() - lastFrameTime > 3000) { 
+      camera_fb_t* fb = esp_camera_fb_get();
+      if (fb) {
+        Serial.printf("Enviando %d bytes...", fb->len);
+        
+        // Envia e verifica o sucesso
+        if (webSocket.sendBIN(fb->buf, fb->len)) {
+          Serial.println(" OK!");
+          lastFrameTime = millis();
+        } else {
+          Serial.println(" FALHA!");
+          // Se falhar, espera um pouco mais antes da próxima tentativa
+          lastFrameTime = millis() + 2000; 
+        }
+        esp_camera_fb_return(fb);
       }
-      
-      esp_camera_fb_return(fb);
     }
   }
-  usleep(1000); // 1ms de descanso para o sistema
+  delay(1);
 }
